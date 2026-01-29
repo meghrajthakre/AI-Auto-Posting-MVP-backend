@@ -269,6 +269,160 @@ router.get("/github/callback", async (req, res) => {
 });
 
 
+// token refresh route can be added here
+router.post(
+  "/api/accounts/:accountId/refresh",
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params;
+
+      const account = await ConnectedAccount.findOne({
+        id: accountId,
+        userId: req.user.id
+      }).select("+accessToken +refreshToken");
+
+      if (!account) {
+        return res.status(404).json({
+          success: false,
+          message: "Account not found"
+        });
+      }
+
+      // If token not expired
+      if (!account.isTokenExpired()) {
+        return res.json({
+          success: true,
+          data: {
+            isTokenValid: true,
+            lastTokenRefresh: account.lastTokenRefresh
+          }
+        });
+      }
+
+      // 🔁 Platform-specific refresh
+      let refreshed = false;
+
+      if (account.platform === "linkedin") {
+        refreshed = await refreshLinkedInToken(account);
+      }
+
+      if (account.platform === "x" || account.platform === "twitter") {
+        refreshed = await refreshTwitterToken(account);
+      }
+
+      // GitHub doesn't support refresh
+      if (account.platform === "github") {
+        account.isTokenValid = false;
+        await account.save();
+
+        return res.json({
+          success: true,
+          data: {
+            isTokenValid: false,
+            lastTokenRefresh: account.lastTokenRefresh
+          }
+        });
+      }
+
+      if (!refreshed) {
+        account.isTokenValid = false;
+        await account.save();
+      }
+
+      res.json({
+        success: true,
+        data: {
+          isTokenValid: account.isTokenValid,
+          lastTokenRefresh: account.lastTokenRefresh
+        }
+      });
+    } catch (err) {
+      console.error("Refresh token error:", err);
+      res.status(500).json({
+        success: false,
+        message: "Token refresh failed"
+      });
+    }
+  }
+);
+
+// LinkedIn token refresh
+async function refreshLinkedInToken(account) {
+  try {
+    const refreshToken = account.decryptToken("refresh");
+
+    const res = await axios.post(
+      "https://www.linkedin.com/oauth/v2/accessToken",
+      new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: process.env.LINKEDIN_CLIENT_ID,
+        client_secret: process.env.LINKEDIN_CLIENT_SECRET
+      })
+    );
+
+    account.encryptTokens(
+      res.data.access_token,
+      res.data.refresh_token || refreshToken
+    );
+
+    account.tokenExpiresAt = new Date(
+      Date.now() + res.data.expires_in * 1000
+    );
+
+    account.lastTokenRefresh = new Date();
+    account.isTokenValid = true;
+
+    await account.save();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+// X (Twitter) token refresh
+async function refreshTwitterToken(account) {
+  try {
+    const refreshToken = account.decryptToken("refresh");
+
+    const res = await axios.post(
+      "https://api.twitter.com/2/oauth2/token",
+      new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: process.env.TWITTER_CLIENT_ID
+      }),
+      {
+        headers: {
+          Authorization:
+            "Basic " +
+            Buffer.from(
+              `${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`
+            ).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded"
+        }
+      }
+    );
+
+    account.encryptTokens(
+      res.data.access_token,
+      res.data.refresh_token
+    );
+
+    account.tokenExpiresAt = new Date(
+      Date.now() + res.data.expires_in * 1000
+    );
+
+    account.lastTokenRefresh = new Date();
+    account.isTokenValid = true;
+
+    await account.save();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 
 
 export default router;

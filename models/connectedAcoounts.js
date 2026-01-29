@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 
 const connectedAccountSchema = new mongoose.Schema({
   id: {
@@ -114,7 +115,6 @@ connectedAccountSchema.methods.isTokenExpired = function() {
 
 // Method to encrypt tokens (use this before saving)
 connectedAccountSchema.methods.encryptTokens = function(accessToken, refreshToken) {
-  const crypto = require('crypto');
   const algorithm = 'aes-256-gcm';
   const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex'); // 32 bytes
   
@@ -141,7 +141,7 @@ connectedAccountSchema.methods.encryptTokens = function(accessToken, refreshToke
 
 // Method to decrypt tokens (use when needed)
 connectedAccountSchema.methods.decryptToken = function(tokenType = 'access') {
-  const crypto = require('crypto');
+  
   const algorithm = 'aes-256-gcm';
   const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
   

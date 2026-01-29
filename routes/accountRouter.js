@@ -151,6 +151,8 @@ function sha256(buffer) {
     return crypto.createHash("sha256").update(buffer).digest();
 }
 
+// connect twitter account
+
 router.get("/accounts/twitter/connect", authMiddleware, async (req, res) => {
     try {
         const codeVerifier = base64URLEncode(crypto.randomBytes(32));
