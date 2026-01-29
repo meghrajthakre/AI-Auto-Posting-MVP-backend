@@ -2,6 +2,9 @@ import express from "express";
 const router = express.Router();
 import ConnectedAccount from "../models/connectedAcoounts.js";
 import authMiddleware from "../middleware/authMiddleware.js";
+import crypto from "crypto";
+const TWITTER_AUTH_URL = "https://twitter.com/i/oauth2/authorize";
+import OAuthState from "../models/OAuthState.js";
 
 // to get all acoount details
 router.get("/accounts", authMiddleware, async (req, res) => {
@@ -129,6 +132,128 @@ router.get("/accounts/linkedin/callback", async (req, res) => {
     }
 });
 
+// twitter and x routes will go here
+
+
+
+// helper
+function base64URLEncode(buffer) {
+  return buffer
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+}
+
+function sha256(buffer) {
+  return crypto.createHash("sha256").update(buffer).digest();
+}
+
+router.get("/accounts/twitter/connect", authMiddleware, async (req, res) => {
+  try {
+    const codeVerifier = base64URLEncode(crypto.randomBytes(32));
+    const codeChallenge = base64URLEncode(sha256(codeVerifier));
+
+    const state = `${req.user.id}-${Date.now()}`;
+
+    
+    await OAuthState.create({
+      userId: req.user.id,
+      platform: "twitter",
+      state,
+      codeVerifier,
+    });
+
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: process.env.TWITTER_CLIENT_ID,
+      redirect_uri: process.env.TWITTER_REDIRECT_URI,
+      scope: "tweet.read users.read offline.access",
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+    });
+
+    // 🔁 DIRECT REDIRECT (302)
+    return res.redirect(`${TWITTER_AUTH_URL}?${params.toString()}`);
+  } catch (err) {
+    console.error("Twitter connect error:", err);
+    return res.status(500).send("Twitter connect failed");
+  }
+});
+
+router.get("/accounts/twitter/callback", async (req, res) => {
+  try {
+    const { code, state } = req.query;
+
+    if (!code || !state) {
+      return res.redirect(`${process.env.FRONTEND_URL}?error=twitter_oauth_failed`);
+    }
+
+    const savedState = await OAuthState.findOne({
+      state,
+      platform: "twitter",
+    });
+
+    if (!savedState) {
+      return res.redirect(`${process.env.FRONTEND_URL}?error=invalid_state`);
+    }
+
+    const tokenRes = await axios.post(
+      "https://api.twitter.com/2/oauth2/token",
+      new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: process.env.TWITTER_REDIRECT_URI,
+        client_id: process.env.TWITTER_CLIENT_ID,
+        code_verifier: savedState.codeVerifier,
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    const { access_token, refresh_token, expires_in } = tokenRes.data;
+
+    // 👤 Get Twitter profile
+    const profileRes = await axios.get("https://api.twitter.com/2/users/me", {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+      },
+    });
+
+    const profile = profileRes.data.data;
+
+    // 💾 Upsert account
+    await ConnectedAccount.findOneAndUpdate(
+      { userId: savedState.userId, platform: "twitter" },
+      {
+        userId: savedState.userId,
+        platform: "twitter",
+        platformUserId: profile.id,
+        platformUsername: profile.username,
+        accessToken: access_token,
+        refreshToken: refresh_token,
+        tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+        isActive: true,
+        isTokenValid: true,
+        connectedAt: new Date(),
+      },
+      { upsert: true }
+    );
+
+    // cleanup
+    await OAuthState.deleteOne({ _id: savedState._id });
+
+    // 🔁 Redirect to dashboard
+    return res.redirect(process.env.FRONTEND_URL);
+  } catch (err) {
+    console.error("Twitter callback error:", err.response?.data || err);
+    return res.redirect(`${process.env.FRONTEND_URL}?error=twitter_failed`);
+  }
+});
 
 
 export default router;
