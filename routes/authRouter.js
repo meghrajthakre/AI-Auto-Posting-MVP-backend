@@ -1,7 +1,8 @@
 import express from "express";
-import bcrypt from "bcrypt";
 const router = express.Router();
 import User from "../models/User.js";
+import authMiddleware from "../middleware/authMiddleware.js";
+import axios from "axios";
 
 // Helper function for email validation
 const isValidEmail = (email) => {
@@ -96,7 +97,6 @@ router.post("/login", async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password required" });
     }
-    console.log("Login attempt for email:", email);
     const user = await User
       .findOne({ email: email.toLowerCase() })
       .select("+password");
@@ -142,7 +142,26 @@ router.post("/logout", (req, res) => {
   res.status(200).json({ success: true, message: "Logged out successfully" });
 });
 
- 
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const user = req.user;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        avatar: user.avatar,
+        plan: user.plan,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error("Fetch user error:", error);
+    res.status(500).json({ message: "Failed to fetch user data" });
+  }
+});
 
 // github OAuth routes will go here
 
@@ -155,7 +174,6 @@ router.get("/github", (req, res) => {
 
   res.redirect(githubAuthURL); // 302 redirect
 });
-import axios from "axios";
 
 router.get("/github/callback", async (req, res) => {
   try {
