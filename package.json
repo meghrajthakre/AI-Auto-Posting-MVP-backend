@@ -1,6 +1,7 @@
 {
   "name": "auto-post-ai-backend",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -8,11 +9,14 @@
   },
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "AI Auto Posting MVP Backend",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "mongoose": "^9.1.5"
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.1.5",
+    "validator": "^13.15.26"
   }
 }
