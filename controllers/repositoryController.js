@@ -1,6 +1,6 @@
 import axios from "axios";
 import Repository from "../models/repository.js";
-import ConnectedAccount from "../models/ConnectedAccount.js";
+import ConnectedAccount from "../models/connectedAcoounts.js";
 
 /**
  * ADD GITHUB REPOSITORY + CREATE WEBHOOK

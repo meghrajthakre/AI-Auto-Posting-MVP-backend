@@ -1,13 +1,12 @@
 import express from "express";
 import axios from "axios";
 import Repository from "../models/repository.js";
-import ConnectedAccount from "../models/ConnectedAccount.js";
 import authMiddleware from "../middleware/authMiddleware.js";
-import axios from "axios";
 import { addRepository } from "../controllers/repositoryController.js";
 import { updateRepositorySettings } from "../controllers/updateRepositorySettings.js";
 import { deleteRepository } from "../controllers/deleteRepository.js";
 import { getRepositoryStats } from "../controllers/getRepositoryStats.js";
+import ConnectedAccount from "../models/connectedAcoounts.js";
 
 const router = express.Router();
 

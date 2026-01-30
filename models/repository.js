@@ -197,4 +197,4 @@ repositorySchema.methods.toPublicJSON = function() {
   };
 };
 
-module.exports = mongoose.model('Repository', repositorySchema);
+export default mongoose.model("Repository", repositorySchema);

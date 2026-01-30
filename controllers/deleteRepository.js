@@ -1,5 +1,5 @@
 import Repository from "../models/repository.js";
-import ConnectedAccount from "../models/ConnectedAccount.js";
+import ConnectedAccount from "../models/connectedAcoounts.js";
 import axios from "axios";
 
 export const deleteRepository = async (req, res) => {
