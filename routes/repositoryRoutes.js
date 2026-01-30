@@ -4,6 +4,10 @@ import Repository from "../models/repository.js";
 import ConnectedAccount from "../models/ConnectedAccount.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import axios from "axios";
+import { addRepository } from "../controllers/repositoryController.js";
+import { updateRepositorySettings } from "../controllers/updateRepositorySettings.js";
+import { deleteRepository } from "../controllers/deleteRepository.js";
+import { getRepositoryStats } from "../controllers/getRepositoryStats.js";
 
 const router = express.Router();
 
@@ -48,9 +52,8 @@ router.get("/repositories", authMiddleware, async (req, res) => {
   }
 });
 
-// ===============================
+
 // Fetch GitHub repositories
-// ===============================
 router.get("/repositories/github/list",authMiddleware,async (req, res) => {
     try {
       const userId = req.user.id;
@@ -120,6 +123,35 @@ router.get("/repositories/github/list",authMiddleware,async (req, res) => {
       });
     }
   }
+);
+
+// add repository
+router.post(
+  "/repositories/github/add",
+  authMiddleware,
+  addRepository
+);
+
+
+// update repository settings
+router.patch(
+  "/repositories/:repoId",
+  authMiddleware,
+  updateRepositorySettings
+);
+
+// delete repository
+router.delete(
+  "/repositories/:repoId",
+  authMiddleware,
+  deleteRepository
+);
+
+// get stats for a repository
+router.get(
+  "/repositories/:repoId/stats",
+  authMiddleware,
+  getRepositoryStats
 );
 
 export default router;
